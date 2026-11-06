@@ -1,0 +1,20 @@
+{
+  "name": "tiny",
+  "interface": {
+    "displayName": "Tiny"
+  },
+  "plugins": [
+    {
+      "name": "tiny",
+      "source": {
+        "source": "local",
+        "path": "./plugin/tiny"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

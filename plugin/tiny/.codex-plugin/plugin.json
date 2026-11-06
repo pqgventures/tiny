@@ -1,0 +1,25 @@
+{
+  "name": "tiny",
+  "version": "0.1.0",
+  "description": "Make a Tiny of any place: a pixel-art isometric diorama of your street, neighbourhood or campus, built from OpenStreetMap and painted by your ChatGPT plan's image generation.",
+  "author": {
+    "name": "PQG Ventures"
+  },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Tiny",
+    "shortDescription": "A pixel-art Tiny of any place",
+    "longDescription": "Pick any place in the world. Tiny draws its streets and buildings from OpenStreetMap, paints every tile in isometric pixel art with the image generation in your ChatGPT plan, stitches it into one map you can pan and zoom, and keeps it on your computer. No API key and no cost beyond your plan.",
+    "developerName": "PQG Ventures",
+    "category": "Productivity",
+    "capabilities": [
+      "Interactive",
+      "Write"
+    ],
+    "defaultPrompt": [
+      "@Tiny make a Tiny of Largo da Batata, São Paulo",
+      "@Tiny make a Tiny of my street",
+      "@Tiny make a Tiny of Shibuya Crossing"
+    ]
+  }
+}
