@@ -11,7 +11,7 @@ The scripts live next to this file in `../../scripts/` (resolve the absolute pat
 
 ## 1. Draw the base
 
-Pick a short folder name for the place under `~/Tiny/` (e.g. `~/Tiny/largo-da-batata`). Radius: 260 m by default (15 tiles, ~9 minutes two at a time); 180 m for a single street corner (10 tiles to paint); up to 400 m if the user asks for something bigger. The base always adds a 100 m margin around the radius where the city keeps going and then fades into fog and clouds, so the Tiny never ends on an empty edge.
+Pick a short folder name for the place under `~/Tiny/` (e.g. `~/Tiny/largo-da-batata`). Radius: 260 m by default (11 tiles to paint, about 15 minutes); 180 m for a single street corner (about 8 tiles); up to 400 m if the user asks for something bigger. The base always adds a 100 m margin around the radius where the city keeps going and then fades into fog and clouds, so the Tiny never ends on an empty edge.
 
 ```
 python3 <scripts>/base.py "<place, city>" <radius_m> ~/Tiny/<name>
@@ -45,5 +45,5 @@ It paints the missing tiles with `codex exec`, two at a time, and restitches aft
 
 ## 3. Finish
 
-Run `stitch.py` a last time. `qa.json` has `corr_base` per tile (how well it kept the real geometry); repaint once any tile under 0.25. Show the user `tiny.png` and the viewer, with the number of tiles and how long it took. That is their Tiny; it stays on their computer.
+Run `stitch.py` a last time. Its output lists `repintar`: tiles that drifted from the real geometry (`corr_base` under 0.25 in `qa.json`, ignoring tiles that are mostly fog). Repaint each of those once, saving the new image as `gen/<id>-2.png` (keep the first one): `stitch.py` compares every version of a tile and keeps the one closest to the real geometry. Dense centres often score 0.15-0.25 with sharp detail; one repaint is enough. Show the user `tiny.png` and the viewer, with the number of tiles and how long it took. That is their Tiny; it stays on their computer.
 

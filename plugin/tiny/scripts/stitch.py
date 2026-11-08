@@ -30,9 +30,9 @@ def fit(base, g, T):
     return Image.fromarray(a), {'corr_base': round(sc, 3), 'escala': round(s, 2), 'dx': int(dx * k), 'dy': int(dy * k)}
 
 FOG_C = np.array([226, 231, 234], np.float32)
-def fog(img, plan):
-    """a cidade continua até a borda e some numa névoa com bordas de nuvem (em vez de terminar no vazio)"""
-    H, W = img.shape[:2]; R, M = plan['radius_m'], plan['margin_m']; K = plan['K']; x0, y0 = plan['origin']; fi, fo = plan['fog']
+def fog_alpha(H, W, plan):
+    """0 = cidade, 1 = névoa"""
+    R, M = plan['radius_m'], plan['margin_m']; K = plan['K']; x0, y0 = plan['origin']; fi, fo = plan['fog']
     sx = np.arange(W, dtype=np.float32)[None] + x0; sy = np.arange(H, dtype=np.float32)[:, None] + y0
     a = sx / (K * 0.7071); b = -sy / (K * 0.3536); d = np.maximum(np.abs((a + b) / 2), np.abs((b - a) / 2))   # distância no chão (quadrado)
     t = np.clip((d - (R + fi * M)) / ((fo - fi) * M), 0, 1)
@@ -42,6 +42,11 @@ def fog(img, plan):
         z = np.asarray(z, np.float32)[cell:cell + H, cell:cell + W] / 255; n = z * w if n is None else n + z * w
     al = np.clip(t * 1.25 + (n - 0.5) * 0.9 * np.sin(np.pi * np.clip(t, 0, 1)), 0, 1)
     al = al * al * (3 - 2 * al)
+    return al, n
+
+def fog(img, plan, fa=None):
+    """a cidade continua até a borda e some numa névoa com bordas de nuvem (em vez de terminar no vazio)"""
+    al, n = fa if fa is not None else fog_alpha(img.shape[0], img.shape[1], plan)
     puff = 1 + 0.035 * (n - 0.5)[..., None] * 2          # leve volume na névoa
     return img * (1 - al[..., None]) + FOG_C * puff * al[..., None]
 
@@ -49,14 +54,22 @@ def main():
     D = Path(sys.argv[1]); plan = json.loads((D / 'plan.json').read_text()); T, O = plan['tile'], plan['overlap']; W, H = plan['size']
     acc = np.zeros((H + T, W + T, 3), np.float32); wsum = np.zeros((H + T, W + T, 1), np.float32)
     base = Image.open(D / 'base.png').convert('RGB'); qa = {}
+    fa = fog_alpha(H, W, plan) if plan.get('margin_m') else None
     ramp = np.minimum(1, (np.arange(T) + 1) / O); m1 = np.minimum(ramp, ramp[::-1]); mask = np.minimum.outer(m1, m1)[..., None].astype(np.float32)
     for t in plan['tiles']:
         p = D / 'gen' / f"{t['id']}.png"
-        if t.get('fog') and not p.exists(): qa[t['id']] = {'nevoa': True}
-        if p.exists():
-            g = Image.open(p).convert('RGB').resize((T, T), Image.LANCZOS)
+        alts = [q for q in [p] + sorted((D / 'gen').glob(f"{t['id']}-*.png")) if q.exists()]   # repaints: keep the one closest to the base
+        if t.get('fog') and not alts: qa[t['id']] = {'nevoa': True}
+        if alts:
             bt = Image.open(D / 'tiles' / f"{t['id']}.png").convert('RGB')
-            g, info = fit(bt, g, T); qa[t['id']] = info
+            best = None
+            for q in alts:
+                cand = fit(bt, Image.open(q).convert('RGB').resize((T, T), Image.LANCZOS), T)
+                if best is None or cand[1]['corr_base'] > best[1]['corr_base']: best = cand; best[1]['file'] = q.name
+            g, info = best; qa[t['id']] = info
+            vis = float((fa[0][t['y']:t['y'] + T, t['x']:t['x'] + T] < 0.5).sum()) / (T * T) if fa is not None else 1.0
+            info['visivel'] = round(vis, 2); info['repintar'] = info['corr_base'] < 0.25 and vis > 0.3   # quadros quase só de névoa não contam
+        elif t.get('fog'): g = Image.new('RGB', (T, T), tuple(int(v) for v in FOG_C))   # só névoa: nunca pintado
         else:
             g = Image.open(D / 'tiles' / f"{t['id']}.png").convert('RGB'); qa.setdefault(t['id'], {'faltando': True})
         x, y = t['x'], t['y']; ga = np.asarray(g, np.float32)
@@ -67,7 +80,7 @@ def main():
             ga = (ga * gain + off).clip(0, 255); qa[t['id']]['cor'] = [round(float(v), 2) for v in gain]
         acc[y:y + T, x:x + T] += ga * mask; wsum[y:y + T, x:x + T] += mask
     img = (acc / np.maximum(wsum, 1e-6))[:H, :W]
-    if plan.get('margin_m'): img = fog(img, plan)
+    if fa is not None: img = fog(img, plan, fa)
     img = img.clip(0, 255).astype(np.uint8)
     out = Image.fromarray(img); out.save(D / 'tiny.png'); out.save(D / 'tiny.jpg', quality=88)
     (D / 'qa.json').write_text(json.dumps(qa, indent=1))
@@ -84,6 +97,7 @@ v.onwheel=e=>{{e.preventDefault();const k=Math.exp(-e.deltaY*0.0015),n=Math.min(
 v.onpointerdown=e=>{{d=[e.clientX-x,e.clientY-y];v.setPointerCapture(e.pointerId)}};v.onpointermove=e=>{{if(d){{x=e.clientX-d[0];y=e.clientY-d[1];ap()}}}};v.onpointerup=()=>d=null;
 </script>""")
     print(json.dumps({'tiny': str(D / 'tiny.png'), 'gerados': sum(1 for v in qa.values() if 'corr_base' in v), 'total': sum(1 for v in qa.values() if 'nevoa' not in v),
-                      'corr_media': round(float(np.mean([v['corr_base'] for v in qa.values() if 'corr_base' in v] or [0])), 3)}))
+                      'corr_media': round(float(np.mean([v['corr_base'] for v in qa.values() if 'corr_base' in v] or [0])), 3),
+                      'repintar': [k for k, v in qa.items() if v.get('repintar')]}))
 if __name__ == '__main__': main()
 

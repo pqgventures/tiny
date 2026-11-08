@@ -181,12 +181,13 @@ def main():
             bx, by = c * step, r * step
             crop = Image.new('RGB', (TILE, TILE), (214, 207, 190)); crop.paste(im.crop((bx, by, min(W, bx + TILE), min(H, by + TILE))), (0, 0))
             crop.save(out / 'tiles' / f'{c}_{r}.png'); tiles.append({'id': f'{c}_{r}', 'c': c, 'r': r, 'x': bx, 'y': by})
-    # quadros inteiros dentro da névoa (todo ponto do chão do quadro além de R+FOG_OUT*M) não precisam de pintura
+    # quadros que ficam quase todos dentro da névoa não são pintados (stitch.py usa a cor da névoa neles)
     def ground_d(px, py):
         sx, sy = px + x0, py + y0; a = sx / (K * 0.7071); b = -sy / (K * 0.3536); return max(abs((a + b) / 2), abs((b - a) / 2))
-    for t in tiles:
-        pts = [(t['x'] + i * TILE / 8, t['y'] + j * TILE / 8) for i in range(9) for j in range(9)]
-        t['fog'] = M > 0 and min(ground_d(px, py + maxh * 0.5) for px, py in pts) > R + FOG_OUT * M
+    for t in tiles:   # share of the tile that stays visible through the fog (stitch.py: fog alpha < 0.5 at about R + 0.55*M)
+        pts = [(t['x'] + (i + .5) * TILE / 16, t['y'] + (j + .5) * TILE / 16) for i in range(16) for j in range(16)]
+        vis = sum(1 for px, py in pts if px < W and py < H and ground_d(px, py) < R + 0.55 * M) / len(pts)
+        t['visible'] = round(vis, 2); t['fog'] = M > 0 and vis < 0.05
     cc, cr = (cols - 1) / 2, (rows - 1) / 2
     tiles.sort(key=lambda t: max(abs(t['c'] - cc), abs(t['r'] - cr)))   # do centro para fora
     plan = {'place': place, 'name': name, 'lat': lat, 'lon': lon, 'radius_m': R, 'margin_m': M, 'origin': [x0, y0], 'K': K, 'fog': [FOG_IN, FOG_OUT],
