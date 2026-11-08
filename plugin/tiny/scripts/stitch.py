@@ -87,14 +87,21 @@ def main():
     name = plan.get('name', '').split(',')[0]
     (D / 'index.html').write_text(f"""<!doctype html><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1">
 <title>Tiny {name}</title><style>html,body{{margin:0;height:100%;background:#e2e7ea;overflow:hidden;font:15px system-ui}}
-#v{{position:absolute;inset:0;cursor:grab}}#v img{{position:absolute;transform-origin:0 0;image-rendering:pixelated;user-select:none}}
+#v{{position:absolute;inset:0;overflow:hidden;cursor:grab;touch-action:none}}#v img{{max-width:none}}#v img{{position:absolute;transform-origin:0 0;image-rendering:pixelated;user-select:none}}
 h1{{position:fixed;left:16px;top:12px;margin:0;font-size:18px;background:#fffd;padding:6px 10px;border-radius:8px}}</style>
 <h1>Tiny {name}</h1><div id=v><img id=i src="tiny.jpg" draggable=false></div><script>
-const v=document.getElementById('v'),i=document.getElementById('i');let s=1,x=0,y=0,d=null;
+const v=document.getElementById('v'),i=document.getElementById('i');let s=1,x=0,y=0,last=null;const P=new Map();
 const ap=()=>i.style.transform='translate('+x+'px,'+y+'px) scale('+s+')';
-i.onload=()=>{{s=Math.max(innerWidth/i.naturalWidth,innerHeight/i.naturalHeight);x=(innerWidth-i.naturalWidth*s)/2;y=(innerHeight-i.naturalHeight*s)/2;ap()}};
-v.onwheel=e=>{{e.preventDefault();const k=Math.exp(-e.deltaY*0.0015),n=Math.min(4,Math.max(0.1,s*k));x=e.clientX-(e.clientX-x)*n/s;y=e.clientY-(e.clientY-y)*n/s;s=n;ap()}};
-v.onpointerdown=e=>{{d=[e.clientX-x,e.clientY-y];v.setPointerCapture(e.pointerId)}};v.onpointermove=e=>{{if(d){{x=e.clientX-d[0];y=e.clientY-d[1];ap()}}}};v.onpointerup=()=>d=null;
+const fit=()=>{{s=Math.max(innerWidth/i.naturalWidth,innerHeight/i.naturalHeight);x=(innerWidth-i.naturalWidth*s)/2;y=(innerHeight-i.naturalHeight*s)/2;ap()}};
+if(i.complete&&i.naturalWidth)fit();else i.addEventListener('load',fit);
+const zoomAt=(cx,cy,k)=>{{const n=Math.min(4,Math.max(0.1,s*k));x=cx-(cx-x)*n/s;y=cy-(cy-y)*n/s;s=n;ap()}};
+v.onwheel=e=>{{e.preventDefault();zoomAt(e.clientX,e.clientY,Math.exp(-e.deltaY*0.0015))}};
+v.onpointerdown=e=>{{v.setPointerCapture(e.pointerId);P.set(e.pointerId,[e.clientX,e.clientY]);last=null}};
+v.onpointermove=e=>{{if(!P.has(e.pointerId))return;const o=P.get(e.pointerId);P.set(e.pointerId,[e.clientX,e.clientY]);
+ if(P.size===1){{x+=e.clientX-o[0];y+=e.clientY-o[1];ap()}}
+ else if(P.size===2){{const [a,b]=[...P.values()],d=Math.hypot(a[0]-b[0],a[1]-b[1]),m=[(a[0]+b[0])/2,(a[1]+b[1])/2];
+  if(last){{x+=m[0]-last.m[0];y+=m[1]-last.m[1];zoomAt(m[0],m[1],d/last.d)}}last={{d,m}}}}}};
+v.onpointerup=v.onpointercancel=e=>{{P.delete(e.pointerId);last=null}};
 </script>""")
     print(json.dumps({'tiny': str(D / 'tiny.png'), 'gerados': sum(1 for v in qa.values() if 'corr_base' in v), 'total': sum(1 for v in qa.values() if 'nevoa' not in v),
                       'corr_media': round(float(np.mean([v['corr_base'] for v in qa.values() if 'corr_base' in v] or [0])), 3),
