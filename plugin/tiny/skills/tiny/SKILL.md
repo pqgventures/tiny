@@ -11,13 +11,13 @@ The scripts live next to this file in `../../scripts/` (resolve the absolute pat
 
 ## 1. Draw the base
 
-Pick a short folder name for the place under `~/Tiny/` (e.g. `~/Tiny/largo-da-batata`). Radius: 260 m by default (8 tiles, ~12 minutes); 180 m for a single street corner (about 4 tiles); up to 400 m (about 18 tiles) if the user asks for something bigger.
+Pick a short folder name for the place under `~/Tiny/` (e.g. `~/Tiny/largo-da-batata`). Radius: 260 m by default (15 tiles, ~9 minutes two at a time); 180 m for a single street corner (10 tiles to paint); up to 400 m if the user asks for something bigger. The base always adds a 100 m margin around the radius where the city keeps going and then fades into fog and clouds, so the Tiny never ends on an empty edge.
 
 ```
 python3 <scripts>/base.py "<place, city>" <radius_m> ~/Tiny/<name>
 ```
 
-It geocodes the place, downloads buildings, streets, parks, water and trees from OpenStreetMap (can take up to a minute), and writes `base.png`, `tiles/<id>.png` and `plan.json` (tiles sorted from the centre outwards). Tell the user in one line what was found: the place name and number of buildings and tiles. Then build the viewer right away and open it beside the chat, so they watch the map fill in:
+It geocodes the place, downloads (for the radius plus the margin) buildings, streets, parks, water and trees from OpenStreetMap (can take up to a minute), and writes `base.png`, `tiles/<id>.png` and `plan.json` (tiles sorted from the centre outwards). Tell the user in one line what was found: the place name and number of buildings and tiles. Then build the viewer right away and open it beside the chat, so they watch the map fill in:
 
 ```
 python3 <scripts>/stitch.py ~/Tiny/<name>
@@ -27,7 +27,7 @@ Open `~/Tiny/<name>/index.html` (in-app browser or the user's browser).
 
 ## 2. Paint every tile
 
-Copy `<scripts>/prompt.txt` to the folder. For each tile in `plan.json` order, skipping ones already in `gen/`:
+Copy `<scripts>/prompt.txt` to the folder. For each tile in `plan.json` order, skipping ones already in `gen/` and ones with `"fog": true` (they sit entirely in the fog and are never painted):
 
 1. Call the built-in image generation tool ONCE as an edit of exactly one input image, `tiles/<id>.png`, with the prompt from `prompt.txt` verbatim. Only the one base tile: extra reference images make the geometry drift.
 2. Copy the generated PNG to `gen/<id>.png`.
