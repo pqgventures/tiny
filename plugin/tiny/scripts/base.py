@@ -8,6 +8,7 @@ grava <saida>/base.png (mapa inteiro), <saida>/tiles/<c>_<l>.png (quadros 1024 c
 """
 import sys, json, math, hashlib, urllib.parse, os, subprocess, time
 from pathlib import Path
+import numpy as np
 from PIL import Image, ImageDraw
 
 UA = {'User-Agent': 'tiny-plugin/0.2 (+https://github.com/pqgventures/tiny)'}
@@ -38,7 +39,7 @@ def overpass(lat, lon, half_m):
 way["building"]{a};relation["building"]{a};
 way["highway"]{a};
 way["leisure"~"park|garden|pitch|playground"]{a};way["landuse"~"grass|park|forest|meadow|recreation_ground|cemetery"]{a};
-way["natural"~"water|wood|scrub|beach|sand"]{a};relation["natural"="water"]{a};way["waterway"~"river|canal|stream"]{a};
+way["natural"~"water|wood|scrub|beach|sand|coastline"]{a};relation["natural"="water"]{a};way["waterway"~"river|canal|stream"]{a};
 way["amenity"~"parking"]{a};way["railway"~"rail|subway|tram"]{a};
 node["natural"="tree"]{a};
 );out geom;"""
@@ -50,6 +51,40 @@ node["natural"="tree"]{a};
             except Exception as e: err = e
         if rnd == 0: print('OpenStreetMap servers are busy, trying again in 30 s...', file=sys.stderr, flush=True); time.sleep(30)
     raise SystemExit(f'OpenStreetMap download failed on every server ({err}). Wait a few minutes and run the same command again.')
+
+def rings(parts):
+    """join the outer ways of a multipolygon into closed rings (big rivers and lakes come in many pieces)"""
+    parts = [list(p) for p in parts if len(p) >= 2]; out = []
+    while parts:
+        r = parts.pop(0); changed = True
+        while r[0] != r[-1] and changed:
+            changed = False
+            for i, q in enumerate(parts):
+                if q[0] == r[-1]: r = r + q[1:]
+                elif q[-1] == r[-1]: r = r + q[-2::-1]
+                elif q[-1] == r[0]: r = q[:-1] + r
+                elif q[0] == r[0]: r = q[::-1][:-1] + r
+                else: continue
+                parts.pop(i); changed = True; break
+        out.append(r)
+    return out
+
+def sea(feats, half, G=2.0):
+    """sea and estuaries are not polygons in OSM: the coastline has land on its left. Rasterise the coastline on a ground
+    grid (G metres per cell, north up) and flood-fill from points just to its right. Returns (mask, to_grid) or None."""
+    coast = [g for t, g in feats if t.get('natural') == 'coastline' and len(g) >= 2]
+    if not coast: return None
+    n = int(2 * half / G) + 1; grid = Image.new('L', (n, n), 0); gd = ImageDraw.Draw(grid)
+    to = lambda x, y: ((x + half) / G, (half - y) / G)
+    for g in coast: gd.line([to(x, y) for x, y in g], fill=1, width=3)
+    for g in coast:
+        for (ax, ay), (bx, by) in zip(g, g[1:]):
+            L = math.hypot(bx - ax, by - ay)
+            if L < 4: continue
+            cx, cy = to((ax + bx) / 2 + (by - ay) / L * 7, (ay + by) / 2 - (bx - ax) / L * 7)
+            ci = (int(cx), int(cy))
+            if 0 <= ci[0] < n and 0 <= ci[1] < n and grid.getpixel(ci) == 0: ImageDraw.floodfill(grid, ci, 2)
+    return np.asarray(grid) == 2
 
 def main():
     place = sys.argv[1]; R = int(sys.argv[2]) if len(sys.argv) > 2 else 260; M = int(sys.argv[4]) if len(sys.argv) > 4 else 100
@@ -67,7 +102,7 @@ def main():
     for e in els:
         t = e.get('tags', {}); geoms = []
         if e['type'] == 'way' and 'geometry' in e: geoms = [[xy(p) for p in e['geometry']]]
-        elif e['type'] == 'relation': geoms = [[xy(p) for p in m['geometry']] for m in e.get('members', []) if m.get('role') == 'outer' and 'geometry' in m]
+        elif e['type'] == 'relation': geoms = rings([[xy(p) for p in m['geometry']] for m in e.get('members', []) if m.get('role') == 'outer' and 'geometry' in m])
         elif e['type'] == 'node': geoms = [[xy(e)]]
         for g in geoms: feats.append((t, g))
     # limites da área (losango recortado em quadrado no chão)
@@ -80,6 +115,14 @@ def main():
     # chão: área fora do raio fica num tom mais claro
     d.polygon([P(-RO, -RO), P(RO, -RO), P(RO, RO), P(-RO, RO)], fill=(214, 207, 190))
     GREEN = (148, 186, 112); WATER = (118, 170, 206)
+    sm = sea(feats, RO + 40)
+    if sm is not None and sm.any():   # paint the sea / estuary under everything else
+        gx, gy = np.meshgrid(np.arange(W, dtype=np.float32) + x0, np.arange(H, dtype=np.float32) + y0)
+        a = gx / (K * 0.7071); b = -gy / (K * 0.3536); X, Y = (a + b) / 2, (b - a) / 2
+        half = RO + 40; ci = ((X + half) / 2.0).astype(int); ri = ((half - Y) / 2.0).astype(int)
+        ok = (ci >= 0) & (ci < sm.shape[1]) & (ri >= 0) & (ri < sm.shape[0]) & (np.abs(X) <= RO) & (np.abs(Y) <= RO)
+        m = np.zeros((H, W), bool); m[ok] = sm[ri[ok], ci[ok]]
+        im.paste(WATER, mask=Image.fromarray((m * 255).astype(np.uint8))); d = ImageDraw.Draw(im)
     def ground(t):
         if t.get('natural') in ('water',) or t.get('waterway'): return WATER
         if t.get('natural') in ('beach', 'sand'): return (232, 214, 168)
