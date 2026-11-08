@@ -17,7 +17,7 @@ Pick a short folder name for the place under `~/Tiny/` (e.g. `~/Tiny/largo-da-ba
 python3 <scripts>/base.py "<place, city>" <radius_m> ~/Tiny/<name>
 ```
 
-It geocodes the place, downloads (for the radius plus the margin) buildings, streets, parks, water and trees from OpenStreetMap (can take up to a minute), and writes `base.png`, `tiles/<id>.png` and `plan.json` (tiles sorted from the centre outwards). Tell the user in one line what was found: the place name and number of buildings and tiles. Then build the viewer right away and open it beside the chat, so they watch the map fill in:
+It geocodes the place, downloads (for the radius plus the margin) buildings, streets, parks, water and trees from OpenStreetMap (can take up to a minute), and writes `base.png`, `tiles/<id>.png` and `plan.json` (tiles sorted from the centre outwards). Tell the user in one line what was found: the place name and number of buildings and tiles. If it says the OpenStreetMap servers are busy, tell the user in one line and run the same command again (it caches nothing until it succeeds); give up only after three tries. Then build the viewer right away and open it beside the chat, so they watch the map fill in:
 
 ```
 python3 <scripts>/stitch.py ~/Tiny/<name>

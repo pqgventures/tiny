@@ -6,7 +6,7 @@ margem_m (padrão 100): faixa em volta do raio com a cidade continuando; o stitc
 e os quadros que ficam inteiros na névoa não são pintados (fog=true no plan.json).
 grava <saida>/base.png (mapa inteiro), <saida>/tiles/<c>_<l>.png (quadros 1024 com sobreposição) e <saida>/plan.json
 """
-import sys, json, math, hashlib, urllib.parse, os, subprocess
+import sys, json, math, hashlib, urllib.parse, os, subprocess, time
 from pathlib import Path
 from PIL import Image, ImageDraw
 
@@ -16,8 +16,8 @@ HZ = 3.2         # px por metro de altura
 TILE, OVER = 1024, 224
 FOG_IN, FOG_OUT = 0.3, 0.92   # a névoa começa em R+0,3*margem e fecha em R+0,92*margem (no chão)
 
-def get(url, data=None):
-    cmd = ['curl', '-sS', '--fail', '-m', '200', '-A', UA['User-Agent'], url]
+def get(url, data=None, timeout=200):
+    cmd = ['curl', '-sS', '--fail', '-m', str(timeout), '-A', UA['User-Agent'], url]
     if data is not None: cmd[1:1] = ['--data-binary', '@-']
     r = subprocess.run(cmd, input=data, capture_output=True)
     if r.returncode: raise RuntimeError(r.stderr.decode()[:200])
@@ -28,9 +28,13 @@ def geocode(q):
     if not r: raise SystemExit('lugar não encontrado: ' + q)
     return float(r[0]['lat']), float(r[0]['lon']), r[0]['display_name']
 
-def overpass(lat, lon, R):
-    a = f'(around:{R},{lat},{lon})'
-    q = f"""[out:json][timeout:120];(
+MIRRORS = ('https://overpass-api.de/api/interpreter', 'https://overpass.private.coffee/api/interpreter',
+           'https://maps.mail.ru/osm/tools/overpass/api/interpreter', 'https://overpass.kumi.systems/api/interpreter')
+def overpass(lat, lon, half_m):
+    """everything inside a lat/lon box of +-half_m metres (a box is much faster on Overpass than around:)"""
+    dl = half_m / 110540; dn = half_m / (111320 * math.cos(math.radians(lat)))
+    a = f'({lat - dl:.6f},{lon - dn:.6f},{lat + dl:.6f},{lon + dn:.6f})'
+    q = f"""[out:json][timeout:150];(
 way["building"]{a};relation["building"]{a};
 way["highway"]{a};
 way["leisure"~"park|garden|pitch|playground"]{a};way["landuse"~"grass|park|forest|meadow|recreation_ground|cemetery"]{a};
@@ -38,10 +42,14 @@ way["natural"~"water|wood|scrub|beach|sand"]{a};relation["natural"="water"]{a};w
 way["amenity"~"parking"]{a};way["railway"~"rail|subway|tram"]{a};
 node["natural"="tree"]{a};
 );out geom;"""
-    for host in ('https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter'):
-        try: return get(host, urllib.parse.urlencode({'data': q}).encode())['elements']
-        except Exception as e: err = e
-    raise SystemExit(f'overpass falhou: {err}')
+    err = None
+    for rnd in range(2):   # public Overpass servers are often busy: try them all, wait, try again
+        for host in MIRRORS:
+            print(f'OpenStreetMap: asking {host.split("/")[2]}...', file=sys.stderr, flush=True)
+            try: return get(host, urllib.parse.urlencode({'data': q}).encode(), timeout=170)['elements']
+            except Exception as e: err = e
+        if rnd == 0: print('OpenStreetMap servers are busy, trying again in 30 s...', file=sys.stderr, flush=True); time.sleep(30)
+    raise SystemExit(f'OpenStreetMap download failed on every server ({err}). Wait a few minutes and run the same command again.')
 
 def main():
     place = sys.argv[1]; R = int(sys.argv[2]) if len(sys.argv) > 2 else 260; M = int(sys.argv[4]) if len(sys.argv) > 4 else 100
@@ -51,7 +59,7 @@ def main():
     cache = out / 'osm.json'
     if cache.exists() and json.loads(cache.read_text()).get('key') == [lat, lon, RO]: els = json.loads(cache.read_text())['elements']
     else:
-        els = overpass(lat, lon, int(RO * 1.42) + 40); cache.write_text(json.dumps({'key': [lat, lon, RO], 'elements': els}))
+        els = overpass(lat, lon, RO + 40); cache.write_text(json.dumps({'key': [lat, lon, RO], 'elements': els}))
     mx = 111320 * math.cos(math.radians(lat)); my = 110540
     def xy(p): return ((p['lon'] - lon) * mx, (p['lat'] - lat) * my)
     def scr(x, y, z=0): return ((x - y) * K * 0.7071, -(x + y) * K * 0.3536 - z * HZ)
