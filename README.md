@@ -25,7 +25,9 @@ Then, in Codex:
 2. It paints each tile with the built-in image generation, from the centre outwards, keeping every street and building where it really is.
 3. It stitches the tiles into one map (`~/Tiny/<place>/tiny.png`) and a viewer you can pan and zoom (`index.html`).
 
-A default Tiny covers about 520 m across and needs about 15 tiles. Ask for "a street corner" for a smaller one or "something bigger" for up to 800 m.
+A default Tiny covers about 520 m across: 11 tiles, about 15 minutes. Ask for "a street corner" for a smaller one or "something bigger" for up to 800 m. Coasts and rivers come out as water.
+
+![A Tiny of Praça do Comércio, Lisbon](docs/praca-do-comercio.jpg)
 
 Needs `python3` with Pillow and numpy (Codex installs them if missing) and a ChatGPT plan with image generation in Codex.
 
