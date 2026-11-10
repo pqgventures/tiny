@@ -43,13 +43,29 @@ way["natural"~"water|wood|scrub|beach|sand|coastline"]{a};relation["natural"="wa
 way["amenity"~"parking"]{a};way["railway"~"rail|subway|tram"]{a};
 node["natural"="tree"]{a};
 );out geom;"""
-    err = None
-    for rnd in range(2):   # public Overpass servers are often busy: try them all, wait, try again
+    import tempfile
+    err = 'no answer'; data = urllib.parse.urlencode({'data': q}).encode()
+    for rnd in range(2):   # public Overpass servers are often busy: ask them all at once, keep the first answer, drop the rest
+        print('OpenStreetMap: asking %d servers...' % len(MIRRORS), file=sys.stderr, flush=True)
+        ps = []
         for host in MIRRORS:
-            print(f'OpenStreetMap: asking {host.split("/")[2]}...', file=sys.stderr, flush=True)
-            try: return get(host, urllib.parse.urlencode({'data': q}).encode(), timeout=170)['elements']
-            except Exception as e: err = e
-        if rnd == 0: print('OpenStreetMap servers are busy, trying again in 30 s...', file=sys.stderr, flush=True); time.sleep(30)
+            f = tempfile.TemporaryFile()
+            p = subprocess.Popen(['curl', '-sS', '--fail', '--connect-timeout', '10', '-m', '120', '-A', UA['User-Agent'], '--data-binary', '@-', host], stdin=subprocess.PIPE, stdout=f, stderr=subprocess.DEVNULL)
+            try: p.stdin.write(data); p.stdin.close()
+            except OSError: pass
+            ps.append((p, f))
+        try:
+            while ps:
+                for p, f in list(ps):
+                    if p.poll() is None: continue
+                    ps.remove((p, f))
+                    try:
+                        f.seek(0); return json.loads(f.read())['elements']
+                    except Exception as e: err = e if p.returncode == 0 else f'curl {p.returncode}'
+                time.sleep(0.3)
+        finally:
+            for p, f in ps: p.kill()
+        if rnd == 0: print('OpenStreetMap servers are busy, trying again in 20 s...', file=sys.stderr, flush=True); time.sleep(20)
     raise SystemExit(f'OpenStreetMap download failed on every server ({err}). Wait a few minutes and run the same command again.')
 
 def rings(parts):
