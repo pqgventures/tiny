@@ -45,5 +45,25 @@ It paints the missing tiles with `codex exec`, two at a time, and restitches aft
 
 ## 3. Finish
 
-Run `stitch.py` a last time. Its output lists `repintar`: tiles that drifted from the real geometry (`corr_base` under 0.25 in `qa.json`, ignoring tiles that are mostly fog). Repaint each of those once, saving the new image as `gen/<id>-2.png` (keep the first one): `stitch.py` compares every version of a tile and keeps the one closest to the real geometry. Dense centres often score 0.15-0.25 with sharp detail; one repaint is enough. Show the user `tiny.png` and the viewer, with the number of tiles and how long it took. That is their Tiny; it stays on their computer.
+Run `stitch.py` a last time. Its output lists `repintar`: tiles that drifted from the real geometry (`corr_base` under 0.25 in `qa.json`, ignoring tiles that are mostly fog). Repaint each of those once, saving the new image as `gen/<id>-2.png` (keep the first one): `stitch.py` compares every version of a tile and keeps the one closest to the real geometry. Dense centres often score 0.15-0.25 with sharp detail; one repaint is enough. Show the user `tiny.png` and the viewer, with the number of tiles and how long it took. That is their Tiny; it stays on their computer unless they publish it.
+
+## 4. Publish to Tiny Cities (only when the user asks)
+
+Tiny Cities is the public page where every Tiny lives, next to Tiny São Paulo and Tiny Barcelona. Publish only when the user asks ("publish it", "put it on Tiny Cities"); the upload is public. Ask what name to sign it with if they have not said (default: anonymous).
+
+```
+python3 <scripts>/hub.py publish ~/Tiny/<name> --by "<their name>"
+```
+
+It uploads the painted tiles (never the user's files or anything else), waits while the hub redraws the place from OpenStreetMap and checks the painting against the real streets (a few minutes), and prints `{"status": "live", "url": ...}`. Give the user the link. If it prints `rejected`, tell them the reason in `why` in one line; the usual fix is repainting the tiles listed by `stitch.py` and publishing again.
+
+## Help paint a city that is already there
+
+When the user asks to "help paint São Paulo" (or another city listed by `python3 <scripts>/hub.py cities` with `"jobs": true`), you paint tiles of the big shared map with their plan. Ask how many tiles they want to give (default 5; each takes one to three minutes). For each one:
+
+1. `python3 <scripts>/hub.py next sao-paulo ~/Tiny/_help --by "<their name>"` prints the tile, `images_in_order` and `prompt_file`.
+2. Call the built-in image generation tool ONCE with exactly those images in that order (the last one is the base to redraw; the others are style references) and the prompt from `prompt_file` verbatim.
+3. `python3 <scripts>/hub.py submit ~/Tiny/_help <generated.png>` with the PNG exactly as generated (no crop, no resize). It answers `"ok": true` or `why`. If refused, repaint that tile once (run `next` again; it hands back the same tile) and move on after a second refusal.
+
+Say one short line per tile ("2/5 · accepted"). At the end tell them how many of their tiles were accepted (`painted_by_you`); accepted tiles go into the city's next expansion.
 
