@@ -136,7 +136,7 @@ def main():
           'service': 5, 'pedestrian': 6, 'footway': 2.5, 'path': 2, 'cycleway': 2.5, 'steps': 2}
     for t, g in feats:
         hw = t.get('highway'); wwy = t.get('waterway'); rw = t.get('railway')
-        if t.get('area') == 'yes' or len(g) < 2: continue
+        if t.get('area') == 'yes' or t.get('tunnel', 'no') != 'no' or len(g) < 2: continue   # tunnels are underground: culverted streams, subways, road tunnels
         if wwy: w, col = {'river': 30, 'canal': 14}.get(wwy, 5), WATER
         elif hw in RW: w, col = RW[hw], (120, 120, 118) if RW[hw] >= 5 else (200, 192, 176)
         elif rw: w, col = 3, (96, 86, 80)
