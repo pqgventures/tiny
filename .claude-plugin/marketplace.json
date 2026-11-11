@@ -1,0 +1,11 @@
+{
+  "name": "tiny",
+  "owner": { "name": "PQG Ventures" },
+  "plugins": [
+    {
+      "name": "tiny",
+      "source": "./plugin/tiny",
+      "description": "Make a Tiny of any place: a pixel-art isometric diorama of your street, drawn from OpenStreetMap and painted tile by tile."
+    }
+  ]
+}

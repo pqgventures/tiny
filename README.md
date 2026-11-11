@@ -13,7 +13,9 @@ codex plugin marketplace add pqgventures/tiny
 codex plugin add tiny@tiny
 ```
 
-Then, in Codex:
+That is Codex CLI; the ChatGPT desktop app lists the same marketplace in its Plugins Directory. In Claude Code: `/plugin install tiny --marketplace pqgventures/tiny`. Any other agent: clone this repo and point it at `AGENTS.md` (painting then needs an OpenRouter key, about US$0.05 a tile).
+
+Then:
 
 ```
 @Tiny make a Tiny of Largo da Batata, São Paulo

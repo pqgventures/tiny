@@ -1,0 +1,8 @@
+{
+  "name": "tiny",
+  "version": "0.3.0",
+  "description": "Make a Tiny of any place: a pixel-art isometric diorama of your street, drawn from OpenStreetMap and painted tile by tile.",
+  "author": { "name": "PQG Ventures" },
+  "repository": "https://github.com/pqgventures/tiny",
+  "license": "MIT"
+}
