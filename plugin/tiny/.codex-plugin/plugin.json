@@ -1,6 +1,6 @@
 {
   "name": "tiny",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "description": "Make a Tiny of any place: a pixel-art isometric diorama of your street, neighbourhood or campus, built from OpenStreetMap and painted by your ChatGPT plan's image generation.",
   "author": {
     "name": "PQG Ventures"
