@@ -21,7 +21,7 @@ def paint(images, prompt):
     req = urllib.request.Request('https://openrouter.ai/api/v1/chat/completions', json.dumps(body).encode(), {'Authorization': 'Bearer ' + key, 'Content-Type': 'application/json'})
     try:
         with urllib.request.urlopen(req, timeout=300) as r: d = json.loads(r.read())
-    except urllib.error.HTTPError as e: raise RuntimeError(f'{e.code}: {e.read()[:200].decode(errors="replace")}')
+    except urllib.error.HTTPError as e: raise RuntimeError(f'{e.code}: {e.read()[:600].decode(errors="replace")}')
     imgs = ((d.get('choices') or [{}])[0].get('message') or {}).get('images') or []
     if not imgs: raise RuntimeError('the model returned no image: ' + json.dumps(d)[:200])
     return Image.open(io.BytesIO(base64.b64decode(imgs[0]['image_url']['url'].split(',', 1)[1]))).convert('RGB'), float((d.get('usage') or {}).get('cost') or 0)
@@ -40,7 +40,9 @@ def tiny(folder, par):
 
 def job(work):
     W = Path(work).expanduser(); images = sorted(W.glob('[0-9]_*'))
-    im, cost = paint(images, (W / 'prompt.txt').read_text()); im.save(W / 'painted.png')
+    try: im, cost = paint(images, (W / 'prompt.txt').read_text())
+    except RuntimeError as e: return print(json.dumps({'error': 'painting failed: ' + str(e)[:600], 'note': 'OpenRouter needs at least US$1 of balance and key limit left to make an image'}))
+    im.save(W / 'painted.png')
     print(json.dumps({'painted': str(W / 'painted.png'), 'usd': round(cost, 4)}))
 
 if __name__ == '__main__':
