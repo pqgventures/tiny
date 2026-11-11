@@ -3,8 +3,9 @@
   hub.py where "<place, city>"                                   does this place start a city, grow one, or already exist?
   hub.py cities
   hub.py publish <tiny_folder> [--name "Place"] [--by "you"]     upload, wait for the check, print the link
-  hub.py next <city> <work_folder> [--by "you"]                  get the next tile to paint (base + style images + prompt)
-  hub.py submit <work_folder> <painted.png>                      send it back; prints accepted or why not
+  hub.py next <city> <work_folder> [--by "you"] [--near "place"]  get the next tile to paint (base + style images + prompt)
+  hub.py submit <work_folder> <painted.png>                      send it back; prints accepted or why not, and your page
+  hub.py me                                                      the page with every tile you painted
 The address comes from TINY_WORLD (Tiny World's own /llms.txt tells you which one to set)."""
 import io, json, os, sys, time, zipfile, urllib.request, urllib.parse, urllib.error
 from pathlib import Path
@@ -20,6 +21,11 @@ def call(path, data=None, ctype='application/json', timeout=180):
         try: return json.loads(e.read())
         except Exception: return {'error': f'Tiny World answered {e.code}'}
     except Exception as e: return {'error': f'could not reach Tiny World ({e})'}
+def me():
+    """a random id kept on this computer, so your tiles stay yours without an account"""
+    f = Path.home() / '.tiny' / 'id'
+    if not f.exists(): f.parent.mkdir(exist_ok=True); f.write_text(__import__('secrets').token_urlsafe(16))
+    return f.read_text().strip()
 def opt(name, default=''):
     return sys.argv[sys.argv.index(name) + 1] if name in sys.argv and sys.argv.index(name) + 1 < len(sys.argv) else default
 def out(o): print(json.dumps(o, ensure_ascii=False))
@@ -47,16 +53,16 @@ def publish(folder):
 
 def nxt(city, work):
     W = Path(work).expanduser(); W.mkdir(parents=True, exist_ok=True)
-    r = call('/api/jobs/next', json.dumps({'city': city, 'who': opt('--by')}).encode())
+    r = call('/api/jobs/next', json.dumps({'city': city, 'who': opt('--by'), 'painter': me(), 'near': opt('--near')}).encode())
     if r.get('error') or not r.get('tile'): return out(r if r.get('error') else {'done': True, 'note': 'nothing left to paint in this city right now'})
     for old in W.glob('[0-9]_*'): old.unlink()
     paths = []
     for i, u in enumerate(r['images']):
-        p = W / f"{i + 1}_{u.rsplit('/', 1)[1]}"
-        with urllib.request.urlopen(urllib.request.Request(HUB + u, headers=UA), timeout=120) as f: p.write_bytes(f.read())
+        p = W / f"{i + 1}_{u.rsplit('/', 1)[1].lstrip('-')}"
+        with urllib.request.urlopen(urllib.request.Request(u if u.startswith('http') else HUB + u, headers=UA), timeout=120) as f: p.write_bytes(f.read())
         paths.append(str(p))
     (W / 'prompt.txt').write_text(r['prompt']); (W / 'job.json').write_text(json.dumps({k: r[k] for k in ('city', 'tile', 'lease')}))
-    out({'tile': r['tile'], 'images_in_order': paths, 'prompt_file': str(W / 'prompt.txt'), 'minutes': r['minutes'], 'left': r['left']})
+    out({'tile': r['tile'], 'images_in_order': paths, 'prompt_file': str(W / 'prompt.txt'), 'minutes': r['minutes'], 'left': r['left']} | ({'km_from_there': r['km_from_there']} if 'km_from_there' in r else {}))
 
 def submit(work, png):
     j = json.loads((Path(work).expanduser() / 'job.json').read_text())
@@ -70,4 +76,5 @@ if __name__ == '__main__':
     elif a[0] == 'publish': publish(a[1])
     elif a[0] == 'next': nxt(a[1], a[2])
     elif a[0] == 'submit': submit(a[1], a[2])
+    elif a[0] == 'me': out({'your_page': HUB + '/me/' + me()})
     else: print(__doc__)
