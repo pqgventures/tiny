@@ -3,7 +3,7 @@
   hub.py where "<place, city>"                                   does this place start a city, grow one, or already exist?
   hub.py cities
   hub.py publish <tiny_folder> [--name "Place"] [--by "you"]     upload, wait for the check, print the link
-  hub.py next <city> <work_folder> [--by "you"] [--near "place"]  get the next tile to paint (base + style images + prompt)
+  hub.py next <city> <work_folder> [--by "you"] [--near "place"] [--tile 33_-50]  get the next tile to paint, or the one the user picked on the map
   hub.py submit <work_folder> <painted.png>                      send it back; prints accepted or why not, and your page
   hub.py me                                                      the page with every tile you painted
 The address comes from TINY_WORLD (Tiny World's own /llms.txt tells you which one to set)."""
@@ -53,7 +53,7 @@ def publish(folder):
 
 def nxt(city, work):
     W = Path(work).expanduser(); W.mkdir(parents=True, exist_ok=True)
-    r = call('/api/jobs/next', json.dumps({'city': city, 'who': opt('--by'), 'painter': me(), 'near': opt('--near')}).encode())
+    r = call('/api/jobs/next', json.dumps({'city': city, 'who': opt('--by'), 'painter': me(), 'near': opt('--near'), 'tile': opt('--tile') or None}).encode())
     if r.get('error') or not r.get('tile'): return out(r if r.get('error') else {'done': True, 'note': 'nothing left to paint in this city right now'})
     for old in W.glob('[0-9]_*'): old.unlink()
     paths = []
