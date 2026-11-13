@@ -78,6 +78,7 @@ It uploads the painted tiles (never the user's files or anything else), waits wh
 When the user asks to "help paint São Paulo" (or another city listed by `python3 <scripts>/hub.py cities` with `"help": true`), you paint tiles of the big shared map with their plan. Ask how many tiles they want to give (default 5; each takes one to three minutes). For each one:
 
 1. `python3 <scripts>/hub.py next sao-paulo ~/Tiny/_help --by "<their name>"` prints the tile, `images_in_order` and `prompt_file`.
+   If they picked a tile on the map ("paint tile 33_-50 of São Paulo"), add `--tile 33_-50` and paint only that one; if the answer says it is taken, tell them and offer the next free tile.
 2. Call your image generation tool ONCE (or run paint_api.py --job ~/Tiny/_help, which writes painted.png there) with exactly those images in that order (the last one is the base to redraw; the others are style references) and the prompt from `prompt_file` verbatim.
 3. `python3 <scripts>/hub.py submit ~/Tiny/_help <generated.png>` with the PNG exactly as generated (no crop, no resize). It answers `"ok": true` or `why`. If refused, repaint that tile once (run `next` again; it hands back the same tile) and move on after a second refusal.
 
